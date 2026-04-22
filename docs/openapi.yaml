@@ -1,0 +1,1070 @@
+openapi: 3.0.3
+info:
+  title: Task Manager API
+  description: >
+    A RESTful API for managing tasks organized into projects and categories.
+    Uses JWT-based authentication. All protected endpoints require a Bearer token
+    obtained from the /api/auth/login endpoint.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/
+    description: Local development servers
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: alice
+        email:
+          type: string
+          example: alice@example.com
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-01-15T10:00:00.000Z'
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: School
+        description:
+          type: string
+          nullable: true
+          example: CS coursework
+        status:
+          type: string
+          example: active
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-01-15T10:00:00.000Z'
+    ProjectWithTasks:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            tasks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  status:
+                    type: string
+                  priority:
+                    type: string
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 1
+        projectId:
+          type: integer
+          example: 1
+        categoryId:
+          type: integer
+          nullable: true
+          example: 1
+        title:
+          type: string
+          example: Finish lab 4
+        description:
+          type: string
+          nullable: true
+          example: Complete and submit lab 4
+        status:
+          type: string
+          example: pending
+        priority:
+          type: string
+          example: high
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-05-01T00:00:00.000Z'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-01-15T10:00:00.000Z'
+    TaskWithRelations:
+      allOf:
+        - $ref: '#/components/schemas/Task'
+        - type: object
+          properties:
+            project:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            category:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                urgency:
+                  type: string
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: ASAP
+        urgency:
+          type: string
+          nullable: true
+          example: high
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-01-15T10:00:00.000Z'
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Error message
+    ValidationError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: string
+          example: ['Field is required']
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Projects
+    description: Project management endpoints
+  - name: Tasks
+    description: Task management endpoints
+  - name: Categories
+    description: Category management endpoints
+
+paths:
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                  example: marco
+                email:
+                  type: string
+                  example: marco@example.com
+                password:
+                  type: string
+                  example: marco1234
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                username: marco
+                email: marco@example.com
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Missing or invalid fields, or password does not meet minimum length requirement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and receive a JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: user@example.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+              example:
+                accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        '400':
+          description: Missing email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: Get all projects for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+              example:
+                - id: 1
+                  userId: 1
+                  name: School
+                  description: CS coursework
+                  status: active
+                  createdAt: '2026-01-15T10:00:00.000Z'
+                - id: 2
+                  userId: 1
+                  name: Personal
+                  description: Personal errands
+                  status: active
+                  createdAt: '2026-01-16T08:00:00.000Z'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Projects]
+      summary: Create a new project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: School
+                description:
+                  type: string
+                  example: CS coursework
+                status:
+                  type: string
+                  enum: [active, completed, archived]
+                  example: active
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              example:
+                id: 1
+                userId: 1
+                name: School
+                description: CS coursework
+                status: active
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Missing required field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Get a project by ID (includes tasks)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Project found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWithTasks'
+              example:
+                id: 1
+                userId: 1
+                name: School
+                description: CS coursework
+                status: active
+                createdAt: '2026-01-15T10:00:00.000Z'
+                tasks:
+                  - id: 1
+                    title: Finish lab 4
+                    status: pending
+                    priority: high
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Projects]
+      summary: Update a project
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: School (Updated)
+                description:
+                  type: string
+                  example: Updated description
+                status:
+                  type: string
+                  enum: [active, completed, archived]
+                  example: completed
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              example:
+                id: 1
+                userId: 1
+                name: School (Updated)
+                description: Updated description
+                status: completed
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Invalid ID or no valid fields provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Projects]
+      summary: Delete a project
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '204':
+          description: Project deleted
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/tasks:
+    get:
+      tags: [Tasks]
+      summary: Get all tasks for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+              example:
+                - id: 1
+                  userId: 1
+                  projectId: 1
+                  categoryId: 1
+                  title: Finish lab 4
+                  description: Complete and submit lab 4
+                  status: pending
+                  priority: high
+                  dueDate: '2026-05-01T00:00:00.000Z'
+                  createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Invalid query parameter value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Tasks]
+      summary: Create a new task
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, projectId]
+              properties:
+                title:
+                  type: string
+                  example: Finish lab 4
+                projectId:
+                  type: integer
+                  example: 1
+                categoryId:
+                  type: integer
+                  nullable: true
+                  example: 1
+                description:
+                  type: string
+                  nullable: true
+                  example: Complete and submit lab 4
+                status:
+                  type: string
+                  enum: [pending, in-progress, completed]
+                  example: pending
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  example: high
+                dueDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: '2026-05-01T00:00:00.000Z'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 1
+                userId: 1
+                projectId: 1
+                categoryId: 1
+                title: Finish lab 4
+                description: Complete and submit lab 4
+                status: pending
+                priority: high
+                dueDate: '2026-05-01T00:00:00.000Z'
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Missing required fields or invalid dueDate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own the referenced project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project or category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Get a task by ID (includes project and category)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Task found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskWithRelations'
+              example:
+                id: 1
+                userId: 1
+                projectId: 1
+                categoryId: 1
+                title: Finish lab 4
+                description: Complete and submit lab 4
+                status: pending
+                priority: high
+                dueDate: '2026-05-01T00:00:00.000Z'
+                createdAt: '2026-01-15T10:00:00.000Z'
+                project:
+                  id: 1
+                  name: School
+                category:
+                  id: 1
+                  name: ASAP
+                  urgency: high
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Tasks]
+      summary: Update a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: Finish lab 4 (updated)
+                description:
+                  type: string
+                  nullable: true
+                  example: Updated description
+                status:
+                  type: string
+                  enum: [pending, in-progress, completed]
+                  example: completed
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  example: high
+                dueDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: '2026-05-01T00:00:00.000Z'
+                categoryId:
+                  type: integer
+                  nullable: true
+                  example: 1
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 1
+                userId: 1
+                projectId: 1
+                categoryId: 1
+                title: Finish lab 4
+                description: Complete and submit lab 4
+                status: completed
+                priority: high
+                dueDate: '2026-05-01T00:00:00.000Z'
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Invalid ID or no valid fields provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task or category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '204':
+          description: Task deleted
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/categories:
+    get:
+      tags: [Categories]
+      summary: Get all categories for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+              example:
+                - id: 1
+                  userId: 1
+                  name: ASAP
+                  urgency: high
+                  createdAt: '2026-01-15T10:00:00.000Z'
+                - id: 2
+                  userId: 1
+                  name: Low Priority
+                  urgency: low
+                  createdAt: '2026-01-16T10:00:00.000Z'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Categories]
+      summary: Create a new category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: ASAP
+                urgency:
+                  type: string
+                  example: high
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+              example:
+                id: 1
+                userId: 1
+                name: ASAP
+                urgency: high
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Missing required field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Category name already exists for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/categories/{id}:
+    get:
+      tags: [Categories]
+      summary: Get a category by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Category found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+              example:
+                id: 1
+                userId: 1
+                name: ASAP
+                urgency: high
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Categories]
+      summary: Update a category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Critical
+                urgency:
+                  type: string
+                  example: very high
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+              example:
+                id: 1
+                userId: 1
+                name: Critical
+                urgency: very high
+                createdAt: '2026-01-15T10:00:00.000Z'
+        '400':
+          description: Invalid ID or no valid fields provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Category name already exists for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '204':
+          description: Category deleted
+        '400':
+          description: ID is not a positive integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: User does not own this category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
