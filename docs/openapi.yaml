@@ -8,8 +8,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:3000/
-    description: Local development servers
+  - url: https://final-project-task-manager-api-service.onrender.com
+    description: Production server
 
 components:
   securitySchemes:
