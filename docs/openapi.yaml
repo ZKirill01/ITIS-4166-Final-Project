@@ -932,8 +932,8 @@ paths:
               example:
                 id: 1
                 userId: 1
-                name: ASAP
-                urgency: high
+                name: Normal
+                urgency: medium
                 createdAt: '2026-01-15T10:00:00.000Z'
         '400':
           description: ID is not a positive integer
@@ -1018,12 +1018,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Category not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '409':
-          description: Category name already exists for this user
           content:
             application/json:
               schema:
